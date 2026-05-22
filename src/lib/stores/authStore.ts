@@ -31,6 +31,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   init: async () => {
+    set({ isLoading: true });
     try {
       const token = await storage.getItemAsync(SECURE_STORE_TOKEN_KEY);
       const userStr = await storage.getItemAsync(SECURE_STORE_USER_KEY);
@@ -38,23 +39,25 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (token && userStr) {
         try {
           const user = JSON.parse(userStr);
-          set({ token, user, error: null });
+          set({ token, user, isLoading: false, error: null });
         } catch (parseError) {
           console.error('Failed to parse user data:', parseError);
-          // Clear corrupted data
           await storage.deleteItemAsync(SECURE_STORE_TOKEN_KEY);
           await storage.deleteItemAsync(SECURE_STORE_USER_KEY);
+          set({ isLoading: false });
         }
+      } else {
+        set({ isLoading: false });
       }
     } catch (e) {
       console.error('Auth init error:', e);
-      // Failed to load, clear local storage state
       try {
         await storage.deleteItemAsync(SECURE_STORE_TOKEN_KEY);
         await storage.deleteItemAsync(SECURE_STORE_USER_KEY);
       } catch (clearError) {
         console.error('Failed to clear storage:', clearError);
       }
+      set({ isLoading: false });
     }
   },
 

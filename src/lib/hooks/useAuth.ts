@@ -16,14 +16,25 @@ export function useAuth() {
     },
   });
 
+  const clearAllErrors = () => {
+    clearError();
+    loginMutation.reset();
+    registerMutation.reset();
+  };
+
+  const combinedError =
+    loginMutation.error ? (loginMutation.error as Error).message :
+    registerMutation.error ? (registerMutation.error as Error).message :
+    error;
+
   return {
     user,
     token,
-    error: loginMutation.error ? (loginMutation.error as Error).message : (registerMutation.error ? (registerMutation.error as Error).message : error),
+    error: combinedError,
     isLoading: loginMutation.isPending || registerMutation.isPending || isLoading,
     login: loginMutation.mutateAsync,
     register: registerMutation.mutateAsync,
     logout,
-    clearError,
+    clearError: clearAllErrors,
   };
 }

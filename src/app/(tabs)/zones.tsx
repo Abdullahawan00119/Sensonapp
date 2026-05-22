@@ -5,43 +5,22 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import ScreenWrapper from '../../components/layout/ScreenWrapper';
 import { COLORS } from '../../lib/constants/colors';
+import { ALL_ZONES, FLOORS } from '../../lib/constants/zones';
 import * as SafeHaptics from '../../lib/utils/haptics';
 
-interface Zone {
-  id: string;
-  name: string;
-  floor: string;
-  sensorCount: number;
-  status: 'ok' | 'warn' | 'crit';
-  statusLabel: string;
-  description: string;
-}
-
-const FLOORS = ['Lobby', 'Floor 1', 'Floor 2', 'Floor 18', 'Floor 22'];
-
-const ALL_ZONES: Zone[] = [
-  { id: 'lobby_main',  name: 'Main Lobby',          floor: 'Lobby',    sensorCount: 5, status: 'ok',   statusLabel: 'Optimal',          description: 'Entry points and reception desk' },
-  { id: 'cellar',      name: 'Wine Cellar Vault',    floor: 'Floor 1',  sensorCount: 2, status: 'ok',   statusLabel: 'Optimal',          description: 'Precision cooling and storage' },
-  { id: 'ballroom',    name: 'Grand Ballroom',       floor: 'Floor 2',  sensorCount: 6, status: 'warn', statusLabel: 'High Humidity',    description: 'Conference and banquet hall' },
-  { id: 'suite_1801',  name: 'Executive Suite 1801', floor: 'Floor 18', sensorCount: 4, status: 'ok',   statusLabel: 'Optimal',          description: 'VIP penthouse environment' },
-  { id: 'suite_2204',  name: 'Luxury Suite 2204',    floor: 'Floor 22', sensorCount: 3, status: 'crit', statusLabel: 'CO₂ Spike',        description: 'Premium suite — harbor view' },
-  { id: 'suite_2201',  name: 'Luxury Suite 2201',    floor: 'Floor 22', sensorCount: 3, status: 'ok',   statusLabel: 'Optimal',          description: 'Premium suite — west wing' },
-];
-
 const statusMap = {
-  ok:   { color: COLORS.statusOk,   bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)'   },
-  warn: { color: COLORS.statusWarn, bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.22)' },
-  crit: { color: COLORS.statusCrit, bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.22)'  },
+  ok:   { color: COLORS.statusOk,   bg: 'rgba(34,197,94,0.08)',  border: 'rgba(34,197,94,0.2)'   },
+  warn: { color: COLORS.statusWarn, bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)' },
+  crit: { color: COLORS.statusCrit, bg: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.22)'  },
 };
 
 export default function Zones() {
   const router = useRouter();
-  const [floor, setFloor] = useState('Floor 22');
+  const [floor, setFloor] = useState<string>('Floor 22');
   const zones = ALL_ZONES.filter(z => z.floor === floor);
 
   return (
     <ScreenWrapper withSafeArea>
-      {/* header */}
       <View style={{ paddingTop: 4, paddingBottom: 20 }}>
         <Text style={{ color: COLORS.textPrimary, fontSize: 20, fontFamily: 'Outfit_700Bold' }}>Zones</Text>
         <Text style={{ color: COLORS.textSecondary, fontSize: 11, fontFamily: 'DMSans_400Regular', marginTop: 2 }}>
@@ -62,12 +41,13 @@ export default function Zones() {
               key={f}
               onPress={() => { SafeHaptics.impact(); setFloor(f); }}
               style={{
-                paddingHorizontal: 14, paddingVertical: 8,
-                borderRadius: 10,
+                paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
                 backgroundColor: active ? COLORS.bgElevated : COLORS.bgSurface,
                 borderWidth: 1,
                 borderColor: active ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.07)',
               }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
             >
               <Text style={{ color: active ? COLORS.textPrimary : COLORS.textSecondary, fontSize: 12, fontFamily: active ? 'Outfit_600SemiBold' : 'DMSans_400Regular' }}>
                 {f}
@@ -98,14 +78,14 @@ export default function Zones() {
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
                 borderRadius: 16, padding: 16,
               }}
-              accessible accessibilityLabel={`${zone.name}, ${zone.statusLabel}`} accessibilityRole="button"
+              accessible
+              accessibilityLabel={`${zone.name}, ${zone.statusLabel}`}
+              accessibilityRole="button"
             >
-              {/* status bar */}
-              <View style={{ width: 3, height: '100%', borderRadius: 2, backgroundColor: s.color, marginRight: 14, alignSelf: 'stretch' }} />
-
+              <View style={{ width: 3, borderRadius: 2, backgroundColor: s.color, marginRight: 14, alignSelf: 'stretch' }} />
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ color: COLORS.textPrimary, fontSize: 14, fontFamily: 'Outfit_600SemiBold' }} numberOfLines={1}>
+                  <Text style={{ color: COLORS.textPrimary, fontSize: 14, fontFamily: 'Outfit_600SemiBold', flex: 1, marginRight: 8 }} numberOfLines={1}>
                     {zone.name}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: s.bg, borderWidth: 1, borderColor: s.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -115,11 +95,9 @@ export default function Zones() {
                     </Text>
                   </View>
                 </View>
-
                 <Text style={{ color: COLORS.textSecondary, fontSize: 11, fontFamily: 'DMSans_400Regular', marginBottom: 8 }}>
                   {zone.description}
                 </Text>
-
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="radio-outline" size={11} color={COLORS.textMuted} />
                   <Text style={{ color: COLORS.textSecondary, fontSize: 10, fontFamily: 'DMSans_400Regular' }}>
@@ -127,7 +105,6 @@ export default function Zones() {
                   </Text>
                 </View>
               </View>
-
               <Ionicons name="chevron-forward" size={15} color={COLORS.textMuted} style={{ marginLeft: 10 }} />
             </Pressable>
           );

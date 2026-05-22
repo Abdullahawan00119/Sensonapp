@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { mockSensorsApi, Sensor } from '../api/sensors';
+import { mockSensorsApi, Sensor, SensorStatusType } from '../api/sensors';
 
-interface Thresholds {
+export interface Thresholds {
   tempMin: number;
   tempMax: number;
   humidityMin: number;
@@ -21,115 +21,79 @@ interface SensorState {
   updateSensorValue: (id: string, value: string) => void;
 }
 
+// Single source of truth for threshold evaluation
+function evaluateSensor(sensor: Sensor, thresholds: Thresholds): Sensor {
+  const val = parseFloat(sensor.value);
+  let statusType: SensorStatusType = sensor.statusType;
+  let status = sensor.status;
+
+  if (sensor.id === 'temp') {
+    if (val > thresholds.tempMax || val < thresholds.tempMin) {
+      statusType = 'warn';
+      status = val > thresholds.tempMax ? 'high' : 'low';
+    } else {
+      statusType = 'ok';
+      status = 'optimal';
+    }
+  } else if (sensor.id === 'humidity') {
+    if (val > thresholds.humidityMax || val < thresholds.humidityMin) {
+      statusType = 'warn';
+      status = val > thresholds.humidityMax ? 'high' : 'low';
+    } else {
+      statusType = 'ok';
+      status = 'optimal';
+    }
+  } else if (sensor.id === 'co2') {
+    if (val > thresholds.co2Max) {
+      statusType = val > thresholds.co2Max * 1.3 ? 'crit' : 'warn';
+      status = statusType === 'crit' ? 'critical' : 'warning';
+    } else {
+      statusType = 'ok';
+      status = 'optimal';
+    }
+  } else if (sensor.id === 'aq') {
+    if (val < thresholds.aqiMin) {
+      statusType = 'warn';
+      status = 'low';
+    } else {
+      statusType = 'ok';
+      status = 'good';
+    }
+  }
+
+  return { ...sensor, statusType, status };
+}
+
+const DEFAULT_THRESHOLDS: Thresholds = {
+  tempMin: 18,
+  tempMax: 26,
+  humidityMin: 30,
+  humidityMax: 65,
+  co2Max: 1200,
+  aqiMin: 70,
+};
+
 export const useSensorStore = create<SensorState>((set, get) => ({
   sensors: [],
   lastUpdated: null,
   isLoading: false,
   error: null,
-  thresholds: {
-    tempMin: 18,
-    tempMax: 26,
-    humidityMin: 30,
-    humidityMax: 65,
-    co2Max: 1200, // standard CO2 warning threshold is around 1000-1200ppm, 1800+ is critical!
-    aqiMin: 70,   // standard AQI warning
-  },
+  thresholds: DEFAULT_THRESHOLDS,
 
   updateThreshold: (key, value) => {
-    set((state) => {
-      const nextThresholds = { ...state.thresholds, [key]: value };
-      
-      // Re-evaluate sensor statuses based on new thresholds
-      const updatedSensors = state.sensors.map((sensor) => {
-        let statusType = sensor.statusType;
-        let statusText = sensor.status;
-        const val = parseFloat(sensor.value);
-
-        if (sensor.id === 'temp') {
-          if (val > nextThresholds.tempMax || val < nextThresholds.tempMin) {
-            statusType = 'warn';
-            statusText = val > nextThresholds.tempMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (sensor.id === 'humidity') {
-          if (val > nextThresholds.humidityMax || val < nextThresholds.humidityMin) {
-            statusType = 'warn';
-            statusText = val > nextThresholds.humidityMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (sensor.id === 'co2') {
-          if (val > nextThresholds.co2Max) {
-            statusType = val > nextThresholds.co2Max * 1.3 ? 'crit' : 'warn';
-            statusText = statusType === 'crit' ? 'critical' : 'warning';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        }
-
-        return {
-          ...sensor,
-          statusType,
-          status: statusText,
-        };
-      });
-
-      return {
-        thresholds: nextThresholds,
-        sensors: updatedSensors,
-      };
+    set(state => {
+      const thresholds = { ...state.thresholds, [key]: value };
+      const sensors = state.sensors.map(s => evaluateSensor(s, thresholds));
+      return { thresholds, sensors };
     });
   },
 
   fetchSensors: async () => {
     set({ isLoading: true, error: null });
     try {
-      const rawSensors = await mockSensorsApi.getSensors();
-      
-      // Apply thresholds override to statuses
+      const raw = await mockSensorsApi.getSensors();
       const { thresholds } = get();
-      const sensors = rawSensors.map((sensor) => {
-        let statusType = sensor.statusType;
-        let statusText = sensor.status;
-        const val = parseFloat(sensor.value);
-
-        if (sensor.id === 'temp') {
-          if (val > thresholds.tempMax || val < thresholds.tempMin) {
-            statusType = 'warn';
-            statusText = val > thresholds.tempMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (sensor.id === 'humidity') {
-          if (val > thresholds.humidityMax || val < thresholds.humidityMin) {
-            statusType = 'warn';
-            statusText = val > thresholds.humidityMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (sensor.id === 'co2') {
-          if (val > thresholds.co2Max) {
-            statusType = val > thresholds.co2Max * 1.3 ? 'crit' : 'warn';
-            statusText = statusType === 'crit' ? 'critical' : 'warning';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        }
-
-        return {
-          ...sensor,
-          statusType,
-          status: statusText,
-        };
-      });
-
+      const sensors = raw.map(s => evaluateSensor(s, thresholds));
       set({
         sensors,
         isLoading: false,
@@ -142,54 +106,15 @@ export const useSensorStore = create<SensorState>((set, get) => ({
   },
 
   updateSensorValue: (id, value) => {
-    set((state) => {
-      const sensors = state.sensors.map((sensor) => {
+    set(state => {
+      const sensors = state.sensors.map(sensor => {
         if (sensor.id !== id) return sensor;
-        
         const val = parseFloat(value);
-        let statusType = sensor.statusType;
-        let statusText = sensor.status;
-        const thresholds = state.thresholds;
-
-        if (id === 'temp') {
-          if (val > thresholds.tempMax || val < thresholds.tempMin) {
-            statusType = 'warn';
-            statusText = val > thresholds.tempMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (id === 'humidity') {
-          if (val > thresholds.humidityMax || val < thresholds.humidityMin) {
-            statusType = 'warn';
-            statusText = val > thresholds.humidityMax ? 'high' : 'low';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        } else if (id === 'co2') {
-          if (val > thresholds.co2Max) {
-            statusType = val > thresholds.co2Max * 1.3 ? 'crit' : 'warn';
-            statusText = statusType === 'crit' ? 'critical' : 'warning';
-          } else {
-            statusType = 'ok';
-            statusText = 'optimal';
-          }
-        }
-
-        const maxRangeVal = id === 'co2' ? 2000 : id === 'humidity' ? 100 : id === 'temp' ? 40 : 1200;
-        const fill = Math.min(100, Math.round((val / maxRangeVal) * 100));
-
-        return {
-          ...sensor,
-          value,
-          fill,
-          statusType,
-          status: statusText,
-        };
+        const maxRange = id === 'co2' ? 2000 : id === 'humidity' ? 100 : id === 'temp' ? 40 : 1200;
+        const fill = Math.min(100, Math.round((val / maxRange) * 100));
+        return evaluateSensor({ ...sensor, value, fill }, state.thresholds);
       });
-
       return { sensors };
     });
-  }
+  },
 }));

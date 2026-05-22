@@ -86,10 +86,18 @@ function Card({ children }: { children: React.ReactNode }) {
 export default function Profile() {
   const { user, logout } = useAuth();
   const { show, Toast } = useToast();
-  const [pushNotif, setPushNotif]   = React.useState(true);
+  const [pushNotif, setPushNotif]     = React.useState(true);
   const [smartAlerts, setSmartAlerts] = React.useState(true);
+  const [confirmLogout, setConfirmLogout] = React.useState(false);
 
   const handleLogout = async () => {
+    if (!confirmLogout) {
+      setConfirmLogout(true);
+      SafeHaptics.impact();
+      // Auto-dismiss confirmation after 4 seconds
+      setTimeout(() => setConfirmLogout(false), 4000);
+      return;
+    }
     SafeHaptics.notification(SafeHaptics.Haptics.NotificationFeedbackType.Warning);
     await logout();
   };
@@ -193,14 +201,25 @@ export default function Profile() {
         <View style={{ marginTop: 28 }}>
           <Pressable
             onPress={handleLogout}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.07)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', borderRadius: 14, paddingVertical: 15 }}
-            accessible accessibilityLabel="Sign out" accessibilityRole="button"
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+              backgroundColor: confirmLogout ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.07)',
+              borderWidth: 1,
+              borderColor: confirmLogout ? 'rgba(239,68,68,0.6)' : 'rgba(239,68,68,0.25)',
+              borderRadius: 14, paddingVertical: 15,
+            }}
+            accessible accessibilityLabel={confirmLogout ? 'Confirm sign out' : 'Sign out'} accessibilityRole="button"
           >
             <Ionicons name="log-out-outline" size={17} color={COLORS.statusCrit} />
             <Text style={{ color: COLORS.statusCrit, fontSize: 14, fontFamily: 'Outfit_600SemiBold', letterSpacing: 0.5 }}>
-              Sign Out
+              {confirmLogout ? 'Tap again to confirm' : 'Sign Out'}
             </Text>
           </Pressable>
+          {confirmLogout && (
+            <Text style={{ color: COLORS.textSecondary, fontSize: 11, fontFamily: 'DMSans_400Regular', textAlign: 'center', marginTop: 8 }}>
+              This will end your session on this device.
+            </Text>
+          )}
         </View>
 
       </ScrollView>
