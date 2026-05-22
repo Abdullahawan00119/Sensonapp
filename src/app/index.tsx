@@ -1,98 +1,137 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from 'react-native-reanimated';
+import Svg, { Circle, Line, Polygon } from 'react-native-svg';
+import { COLORS } from '../lib/constants/colors';
+import { useAuthStore } from '../lib/stores/authStore';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const { width } = Dimensions.get('window');
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+export default function OnboardingSplash() {
+  const router = useRouter();
+  const token = useAuthStore(state => state.token);
+  const logoScale = useSharedValue(1);
+
+  // Logo Pulse Animation (1 -> 1.08 -> 1)
+  useEffect(() => {
+    logoScale.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 1200 }),
+        withTiming(1.0, { duration: 1200 })
+      ),
+      -1, // Infinite
+      true // Reverse
     );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+  }, []);
+
+  // Automatic routing transition after 2.5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (token) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/login');
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [token]);
+
+  const animatedLogoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: logoScale.value }],
+  }));
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <View className="flex-1 bg-bg-void justify-center items-center overflow-hidden">
+      {/* Ambient Glow Orbs */}
+      <View 
+        style={[styles.glowOrb, styles.topRightOrb]} 
+        className="bg-accent-indigo"
+      />
+      <View 
+        style={[styles.glowOrb, styles.bottomLeftOrb]} 
+        className="bg-accent-violet"
+      />
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      {/* Main Logo & Text Stack */}
+      <View className="items-center z-10">
+        {/* Animated Hexagonal SVG Logo */}
+        <Animated.View style={[animatedLogoStyle]} className="mb-8">
+          <Svg height="140" width="140" viewBox="0 0 100 100">
+            {/* Outer Hexagon */}
+            <Polygon
+              points="90,50 70,84.64 30,84.64 10,50 30,15.36 70,15.36"
+              fill="none"
+              stroke={COLORS.accentSoft}
+              strokeWidth="1.5"
+              opacity="0.6"
+            />
+            {/* Inner Hexagon */}
+            <Polygon
+              points="74,50 62,70.78 38,70.78 26,50 38,29.22 62,29.22"
+              fill="none"
+              stroke={COLORS.accentIndigo}
+              strokeWidth="1"
+              opacity="0.4"
+            />
+            {/* Sensor Network Mesh Lines */}
+            <Line x1="50" y1="50" x2="90" y2="50" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
+            <Line x1="50" y1="50" x2="70" y2="84.64" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
+            <Line x1="50" y1="50" x2="30" y2="84.64" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
+            <Line x1="50" y1="50" x2="10" y2="50" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
+            <Line x1="50" y1="50" x2="30" y2="15.36" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
+            <Line x1="50" y1="50" x2="70" y2="15.36" stroke={COLORS.accentSoft} strokeWidth="0.8" opacity="0.4" />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+            {/* Sensor Node Dots */}
+            <Circle cx="90" cy="50" r="3" fill={COLORS.statusOk} />
+            <Circle cx="70" cy="84.64" r="3" fill={COLORS.statusWarn} />
+            <Circle cx="30" cy="84.64" r="3" fill={COLORS.statusInfo} />
+            <Circle cx="10" cy="50" r="3" fill={COLORS.accentSoft} />
+            <Circle cx="30" cy="15.36" r="3" fill={COLORS.statusCrit} />
+            <Circle cx="70" cy="15.36" r="3" fill={COLORS.accentIndigo} />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+            {/* Central Orb */}
+            <Circle cx="50" cy="50" r="7" fill={COLORS.accentSoft} />
+            <Circle cx="50" cy="50" r="4" fill="#FFFFFF" />
+          </Svg>
+        </Animated.View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        {/* Branding text */}
+        <Text 
+          className="text-text-primary text-3xl font-brand-bold tracking-[6px] mb-2 uppercase"
+          style={{ letterSpacing: 8 }}
+        >
+          AuraSense
+        </Text>
+        <Text className="text-text-secondary text-sm font-body tracking-wider text-center mt-1">
+          Intelligent Environment Control
+        </Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+  glowOrb: {
+    position: 'absolute',
+    width: width * 0.7,
+    height: width * 0.7,
+    borderRadius: width * 0.35,
+    opacity: 0.12,
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+  topRightOrb: {
+    top: -width * 0.15,
+    right: -width * 0.15,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  bottomLeftOrb: {
+    bottom: -width * 0.15,
+    left: -width * 0.15,
   },
 });
